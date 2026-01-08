@@ -3,6 +3,8 @@ import { postServices } from "./post.service";
 import { PostStatus } from "../../../generated/prisma/enums";
 import paginationSortingHelper from "../../helpers/paginationSortingHelper";
 
+// Post Create Section
+
 const createPost = async (req: Request, res: Response) => {
   try {
     const user = req.user;
@@ -20,6 +22,8 @@ const createPost = async (req: Request, res: Response) => {
     });
   }
 };
+
+// All Post Get Section
 
 const getAllPost = async (req: Request, res: Response) => {
   try {
@@ -58,6 +62,8 @@ const getAllPost = async (req: Request, res: Response) => {
     });
   }
 };
+
+// Post Get By Id Section
 
 const getPostById = async (req: Request, res: Response) => {
   try {

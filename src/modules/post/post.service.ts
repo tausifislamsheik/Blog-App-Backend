@@ -2,6 +2,9 @@ import { Post, PostStatus } from "../../../generated/prisma/client";
 import { PostWhereInput } from "../../../generated/prisma/models";
 import { prisma } from "../../lib/prisma";
 
+
+// Post Create Section
+
 const createPost = async (
   data: Omit<Post, "id" | "createdAt" | "updatedAt" | "authorId">,
   userId: string
@@ -14,6 +17,8 @@ const createPost = async (
   });
   return result;
 };
+
+// All Post Get Section
 
 const getAllPost = async ({
   search,
@@ -91,6 +96,11 @@ const getAllPost = async ({
     orderBy: {
       [sortBy]: sortOrder,
     },
+    include:{
+      _count:{
+        select: {comments: true}
+      }
+    }
   });
 
   const total = await prisma.post.count({
@@ -109,6 +119,8 @@ const getAllPost = async ({
   };
 };
 
+// Post Get By Id Section
+
 const getPostById = async (postId: string) => {
   return await prisma.$transaction(async (tx) => {
     await tx.post.update({
@@ -125,6 +137,29 @@ const getPostById = async (postId: string) => {
     const result = await tx.post.findUnique({
       where: {
         id: postId,
+      },
+      include: {
+        comments: {
+          where: {
+            parentId: null,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          include: {
+            replies: {
+              orderBy: {
+                createdAt: "asc",
+              },
+              include: {
+                replies: true,
+              },
+            },
+          },
+        },
+        _count:{
+          select: {comments: true}
+        }
       },
     });
     return result;
