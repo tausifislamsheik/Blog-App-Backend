@@ -2,7 +2,6 @@ import { Post, PostStatus } from "../../../generated/prisma/client";
 import { PostWhereInput } from "../../../generated/prisma/models";
 import { prisma } from "../../lib/prisma";
 
-
 // Post Create Section
 
 const createPost = async (
@@ -25,6 +24,7 @@ const getAllPost = async ({
   tags,
   isFeatured,
   status,
+  authorId,
   page,
   limit,
   skip,
@@ -35,6 +35,7 @@ const getAllPost = async ({
   tags: string[] | [];
   isFeatured: boolean | undefined;
   status: PostStatus | undefined;
+  authorId: string;
   page: number;
   limit: number;
   skip: number;
@@ -87,6 +88,12 @@ const getAllPost = async ({
     });
   }
 
+  if (authorId) {
+    andConditions.push({
+      authorId,
+    });
+  }
+
   const allPost = await prisma.post.findMany({
     take: limit,
     skip,
@@ -96,11 +103,11 @@ const getAllPost = async ({
     orderBy: {
       [sortBy]: sortOrder,
     },
-    include:{
-      _count:{
-        select: {comments: true}
-      }
-    }
+    include: {
+      _count: {
+        select: { comments: true },
+      },
+    },
   });
 
   const total = await prisma.post.count({
@@ -157,17 +164,152 @@ const getPostById = async (postId: string) => {
             },
           },
         },
-        _count:{
-          select: {comments: true}
-        }
+        _count: {
+          select: { comments: true },
+        },
       },
     });
     return result;
   });
 };
 
+// Get My Posts Section
+
+const getMyPosts = async (authorId: string) => {
+  await prisma.user.findUniqueOrThrow({
+    where: {
+      id: authorId,
+      status: "Active",
+    },
+    select: {
+      id: true,
+    },
+  });
+  const result = await prisma.post.findMany({
+    where: {
+      authorId,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    include: {
+      _count: {
+        select: {
+          comments: true,
+        },
+      },
+    },
+  });
+
+  // const total = await prisma.post.aggregate({
+  //   _count: {
+  //     id: true
+  //   },
+  //   where: {
+  //     authorId
+  //   }
+  // })
+  return result;
+};
+
+// Post Update Section
+
+const updatePost = async (
+  postId: string,
+  data: Partial<Post>,
+  authorId: string,
+  isAdmin: boolean
+) => {
+  const postData = await prisma.post.findUniqueOrThrow({
+    where: {
+      id: postId,
+    },
+    select: {
+      id: true,
+      authorId: true,
+    },
+  });
+
+  if (!isAdmin && postData.authorId !== authorId) {
+    throw new Error("You are not the owner/creator of this post");
+  }
+
+  if (!isAdmin) {
+    delete data.isFeatured;
+  }
+
+  return await prisma.post.update({
+    where: {
+      id: postId,
+    },
+    data,
+  });
+};
+
+// Post Delete Section
+
+const deletePost = async (postId: string, authorId: string, isAdmin: boolean) => {
+  const postData = await prisma.post.findUniqueOrThrow({
+    where: {
+      id: postId,
+    },
+    select: {
+      id: true,
+      authorId: true,
+    },
+  });
+
+  if (!isAdmin && postData.authorId !== authorId) {
+    throw new Error("You are not the owner/creator of this post");
+  }
+
+  return await prisma.post.delete({
+    where: {
+      id: postId
+    }
+  })
+};
+
+
+// Post Statistics Section
+
+const getStats = async () =>{
+  return await prisma.$transaction(async (tx) =>{
+    const [totalPosts, publishedPosts, draftPosts, archivedPosts, totalComments, totalViews, totalUsers, adminCount, userCount] = await Promise.all([
+           await tx.post.count(),
+           await tx.post.count({where: {status: PostStatus.Published}}),
+           await tx.post.count({where: {status: PostStatus.Draft}}),
+           await tx.post.count({where: {status: PostStatus.Archived}}),
+           await tx.comment.count(),
+           await tx.post.aggregate({_sum: {views: true}}),
+           await tx.user.count(),
+           await tx.user.count({where: {role: "Admin"}}),
+           await tx.user.count({where: {role: "User"}})
+
+    ])
+    return {
+      totalPosts,
+      publishedPosts,
+      draftPosts,
+      archivedPosts,
+      totalComments,
+      totalViews: totalViews._sum.views,
+      totalUsers,
+      adminCount,
+      userCount
+    }
+  })
+}
+
+
+
+
 export const postServices = {
   createPost,
   getAllPost,
   getPostById,
+  getMyPosts,
+  updatePost,
+  deletePost,
+  getStats
 };

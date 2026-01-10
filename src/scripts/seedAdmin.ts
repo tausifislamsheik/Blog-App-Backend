@@ -1,14 +1,13 @@
-import { error } from "node:console"
 import { prisma } from "../lib/prisma"
 import { UserRole } from "../middleware/auth"
 
 const seedAdmin = async () =>{
     try{
         const adminData = {
-            name: "Admin Shaheb1",
-            email: "admin1@gmail.com",
+            name: "Admin Shaheb",
+            email: "admin@gmail.com",
             role: UserRole.Admin,
-            password: "password123"
+            password: process.env.ADMIN_PASS
         }
 
         const existingUser = await prisma.user.findUnique({
